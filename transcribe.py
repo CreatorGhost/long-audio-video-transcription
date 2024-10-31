@@ -5,6 +5,8 @@ import subprocess
 import json
 import time
 from pydub import AudioSegment
+import argparse
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ def compress_audio(input_file, output_file):
         logger.error(f"An error occurred during audio compression: {str(e)}")
         raise
 
-def split_audio(input_file, chunk_length_ms=1800000):  # 30 minutes in milliseconds
+def split_audio(input_file, chunk_length_ms):  # 30 minutes in milliseconds
     audio = AudioSegment.from_file(input_file)
     chunks = []
     for i, chunk in enumerate(audio[::chunk_length_ms]):
@@ -81,7 +83,7 @@ def process_audio(input_file, compressed_file):
 
 def process_chunks(compressed_file):
     logger.info("Splitting audio into chunks...")
-    chunks = split_audio(compressed_file)
+    chunks = split_audio(compressed_file, 30 * 60 * 1000)
     
     all_segments = []
     for i, chunk in enumerate(chunks):
@@ -128,9 +130,26 @@ def cleanup_chunks(chunks):
         os.remove(chunk)
 
 def main():
-    input_file = "test.mp4"
-    output_file = "transcript.txt"
-    compressed_file = "compressed_audio.ogg"
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Transcribe audio/video files using OpenAI Whisper')
+    parser.add_argument('--input', type=str, required=True,
+                       help='Path to input audio/video file')
+    parser.add_argument('--output', type=str, default='.',
+                       help='Path to output directory (default: current directory)')
+    parser.add_argument('--model', type=str, default='whisper-1',
+                       help='Whisper model to use (default: whisper-1)')
+    parser.add_argument('--chunk_size', type=int, default=30,
+                       help='Size of chunks in minutes (default: 30)')
+    
+    args = parser.parse_args()
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(args.output, exist_ok=True)
+    
+    # Construct file paths
+    input_file = args.input
+    output_file = os.path.join(args.output, "transcript.txt")
+    compressed_file = os.path.join(args.output, "compressed_audio.ogg")
     
     try:
         compressed_file = process_audio(input_file, compressed_file)
